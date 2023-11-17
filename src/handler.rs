@@ -105,48 +105,48 @@ async fn edit_todo_handler(path: web::Path<String>, body: web::Json<UpdateTodoSc
 
     let todo = vec.iter_mut().find(|todo| todo.id == Some(id.to_owned()));
 
-    if todo.is_none() {
-        let error_response = GenericResponse {
-            status: "fail".to_string(),
-            message: format!("Todo with id: {} not found", id),
+    if !(todo.is_none()) {
+        let todo = todo.unwrap();
+        let datetime = Utc::now();
+        let title
+            = body.title.to_owned().unwrap_or(todo.title.to_owned());
+        let content = body.content.to_owned().unwrap_or(todo.content.to_owned());
+
+        let payload = Todo {
+            id: todo.id.to_owned(),
+            title: if !title.is_empty() {
+                title
+            } else {
+                todo.title.to_owned()
+            },
+            content: if !content.is_empty() {
+                content
+            } else {
+                todo.content.to_owned()
+            },
+            completed: if body.completed.is_some() {
+                body.completed
+            } else {
+                todo.completed
+            },
+            createAt: todo.createAt,
+            updateAt: Some(datetime),
         };
-        return HttpResponse::NotFound().json(error_response);
+
+        *todo = payload;
+
+        let response = SingleTodoResponse {
+            status: "success".to_string(),
+            data: TodoData { todo: todo.clone() },
+        };
+        return HttpResponse::Ok().json(response);
     }
 
-    let todo = todo.unwrap();
-    let datetime = Utc::now();
-    let title
-        = body.title.to_owned().unwrap_or(todo.title.to_owned());
-    let content = body.content.to_owned().unwrap_or(todo.content.to_owned());
-
-    let payload = Todo {
-        id: todo.id.to_owned(),
-        title: if !title.is_empty() {
-            title
-        } else {
-            todo.title.to_owned()
-        },
-        content: if !content.is_empty() {
-            content
-        } else {
-            todo.content.to_owned()
-        },
-        completed: if body.completed.is_some() {
-            body.completed
-        } else {
-            todo.completed
-        },
-        createAt: todo.createAt,
-        updateAt: Some(datetime),
+    let error_response = GenericResponse {
+        status: "fail".to_string(),
+        message: format!("Todo with id: {} not found", id),
     };
-
-    *todo = payload;
-
-    let response = SingleTodoResponse {
-        status: "success".to_string(),
-        data: TodoData { todo: todo.clone() },
-    };
-    HttpResponse::Ok().json(response)
+    HttpResponse::NotFound().json(error_response)
 }
 
 //delete a record
@@ -156,15 +156,15 @@ async fn delete_todo_handler(path: web::Path<String>, data: web::Data<AppState>)
     let id
         = path.into_inner();
     let todo = vec.iter_mut().find(|todo| todo.id == Some(id.to_owned()));
-    if todo.is_none() {
-        let error_response = GenericResponse {
-            status: "fail".to_string(),
-            message: format!("Todo with id: {} not found", id),
-        };
-        return HttpResponse::NotFound().json(error_response);
+    if !(todo.is_none()) {
+        vec.retain(|todo| todo.id != Some(id.to_owned()));
+        return HttpResponse::NoContent().finish();
     }
-    vec.retain(|todo| todo.id != Some(id.to_owned()));
-    HttpResponse::NoContent().finish()
+    let error_response = GenericResponse {
+        status: "fail".to_string(),
+        message: format!("Todo with id: {} not found", id),
+    };
+    HttpResponse::NotFound().json(error_response)
 }
 
 //config
